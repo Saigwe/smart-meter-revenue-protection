@@ -1,0 +1,49 @@
+version: 2
+models:
+- name: stg_bronze__feeders
+  columns:
+  - name: feeder_id
+    data_tests:
+    - unique
+    - not_null
+- name: stg_bronze__meters
+  columns:
+  - name: meter_id
+    data_tests:
+    - unique
+    - not_null
+  - name: feeder_id
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_bronze__feeders')
+          field: feeder_id
+- name: stg_bronze__readings
+  data_tests:
+  - unique_combination:
+      arguments:
+        columns:
+        - meter_id
+        - reading_ts
+  columns:
+  - name: meter_id
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_bronze__meters')
+          field: meter_id
+- name: stg_bronze__vends
+  columns:
+  - name: vend_id
+    data_tests:
+    - unique
+    - not_null
+  - name: meter_id
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_bronze__meters')
+          field: meter_id

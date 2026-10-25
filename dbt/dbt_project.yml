@@ -1,0 +1,22 @@
+name: smart_meter_revenue_protection
+version: 0.1.0
+config-version: 2
+profile: smart_meter_revenue_protection
+model-paths:
+- models
+macro-paths:
+- macros
+test-paths:
+- tests
+target-path: target
+clean-targets:
+- target
+- dbt_packages
+models:
+  smart_meter_revenue_protection:
+    staging:
+      +schema: silver
+      +materialized: view
+    marts:
+      +schema: gold
+      +materialized: table

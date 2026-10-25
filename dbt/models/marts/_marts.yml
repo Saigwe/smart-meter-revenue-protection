@@ -1,0 +1,12 @@
+version: 2
+models:
+  - name: rpt_meter_weekly_gap
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [meter_id, week_start]
+  - name: rpt_feeder_losses
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [feeder_id, week_start]

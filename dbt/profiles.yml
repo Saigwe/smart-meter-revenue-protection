@@ -1,0 +1,8 @@
+# Kept in-repo so CI and reviewers can run it. Secrets come from environment variables only.
+smart_meter_revenue_protection:
+  target: duckdb
+  outputs:
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../warehouse/smart_meter_revenue_protection.duckdb') }}"
+      threads: 4
