@@ -1,9 +1,20 @@
 version: 2
 sources:
-- name: bronze
-  description: Raw tables, loaded by the fixture generator (CI) or the real-data loaders.
-  tables:
-  - name: feeders
-  - name: meters
-  - name: readings
-  - name: vends
+  - name: lake
+    description: Delta tables in data/lake, read with DuckDB's delta_scan.
+    tables:
+      - name: readings
+        description: REAL Low Carbon London half-hourly readings, 167.9M rows, partitioned by reading_date, z-ordered by meter_id.
+        meta: {external_location: "delta_scan('{{ var('lake') }}/readings')"}
+      - name: sim_meters
+        description: SYNTHETIC meter-to-feeder assignment and tariff.
+        meta: {external_location: "delta_scan('{{ var('lake') }}/sim_meters')"}
+      - name: sim_vends
+        description: SYNTHETIC prepaid top-ups.
+        meta: {external_location: "delta_scan('{{ var('lake') }}/sim_vends')"}
+      - name: sim_feeder_supply
+        description: SYNTHETIC daily energy into each feeder.
+        meta: {external_location: "delta_scan('{{ var('lake') }}/sim_feeder_supply')"}
+      - name: sim_tamper
+        description: GROUND TRUTH of planted theft. Read only by models/simulation and the evaluation, never by detection.
+        meta: {external_location: "delta_scan('{{ var('lake') }}/sim_tamper')"}

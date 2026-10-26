@@ -4,5 +4,5 @@ smart_meter_revenue_protection:
   outputs:
     duckdb:
       type: duckdb
-      path: "{{ env_var('DUCKDB_PATH', '../warehouse/smart_meter_revenue_protection.duckdb') }}"
+      path: "{{ env_var('DUCKDB_PATH', '../warehouse/meters.duckdb') }}"
       threads: 4

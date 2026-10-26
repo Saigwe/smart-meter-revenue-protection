@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  pipeline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,6 +14,57 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
-      - name: Fixture pipeline (synthetic fixture -> dbt build with tests)
+      - run: pip install -r requirements.txt -r spark/requirements.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Fixture pipeline (LCL-format CSVs -> Delta -> simulation -> dbt -> scoring -> lineage tests)
         run: make fixture-all
+      - name: Same pipeline as Spark jobs on the Delta lake
+        run: make spark LAKE=data/fixture/lake RESULTS=data/fixture/results
+      - name: Spark results equal dbt's
+        run: python -m pytest -q spark/test_spark_matches_dbt.py
+      - name: Summary
+        if: always()
+        run: cat data/fixture/results/detection.md data/fixture/results/spark_timings.json >> "$GITHUB_STEP_SUMMARY" || true
+
+  spark-benchmark:
+    # Spark timings on REAL data: 20 of the 168 London Datastore files (about 20M half-hourly readings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r spark/requirements.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/cache@v4
+        with:
+          path: data/raw/Partitioned LCL Data.zip
+          key: lcl-partitioned-v1
+      - name: Download the London Datastore file (cached after the first run)
+        run: |
+          mkdir -p data/raw
+          [ -f "data/raw/Partitioned LCL Data.zip" ] || curl -sL -o "data/raw/Partitioned LCL Data.zip" \
+            "https://data.london.gov.uk/download/vqm0d/04feba67-f1a3-4563-98d0-f3071e3d56d1/Partitioned%20LCL%20Data.zip"
+          cd data/raw && unzip -q -o "Partitioned LCL Data.zip" "Small LCL Data/LCL-June2015v2_1[0-9].csv" "Small LCL Data/LCL-June2015v2_2[0-9].csv"
+          ls "Small LCL Data" | wc -l
+      - name: Load the sample to Delta and simulate
+        run: |
+          python ingestion/load_lcl.py --csv "data/raw/Small LCL Data/*.csv" --lake data/sample/lake
+          python ingestion/simulate.py --lake data/sample/lake
+      - name: Spark jobs on the real sample
+        run: python spark/meter_jobs.py --lake data/sample/lake --out data/sample/spark_timings.json
+      - name: Timings
+        run: cat data/sample/lake/_load_report.json data/sample/spark_timings.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spark-timings
+          path: |
+            data/sample/spark_timings.json
+            data/sample/lake/_load_report.json

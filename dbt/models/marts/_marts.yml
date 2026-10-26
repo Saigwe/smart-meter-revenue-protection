@@ -1,12 +1,59 @@
 version: 2
+
 models:
-  - name: rpt_meter_weekly_gap
+  - name: fct_meter_weekly
     data_tests:
       - unique_combination:
           arguments:
             columns: [meter_id, week_start]
+    columns:
+      - name: feeder_id
+        data_tests: [not_null]
   - name: rpt_feeder_losses
     data_tests:
       - unique_combination:
           arguments:
             columns: [feeder_id, week_start]
+  - name: rpt_meter_features
+    columns:
+      - name: meter_id
+        data_tests: [unique, not_null]
+  - name: sim_meter_daily_metered
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [meter_id, reading_date]
+
+unit_tests:
+  - name: tampering_changes_only_what_the_meter_reports
+    description: Each tamper type alters metered energy from its start date only; credit tampering leaves the meter honest.
+    model: sim_meter_daily_metered
+    given:
+      # typed SQL fixtures: the sources are external Delta tables, so dbt can't introspect their columns
+      - input: source('lake', 'readings')
+        format: sql
+        rows: |
+          select * from (values
+            ('B', 'Std', date '2013-01-01', timestamp '2013-01-01 12:00:00', 1.0),
+            ('B', 'Std', date '2013-06-01', timestamp '2013-06-01 12:00:00', 1.0),
+            ('F', 'Std', date '2013-06-01', timestamp '2013-06-01 12:00:00', 1.0),
+            ('N', 'Std', date '2013-06-01', timestamp '2013-06-01 02:00:00', 1.0),
+            ('N', 'Std', date '2013-06-01', timestamp '2013-06-01 12:00:00', 1.0),
+            ('C', 'Std', date '2013-06-01', timestamp '2013-06-01 12:00:00', 1.0)
+          ) as t(meter_id, tariff, reading_date, reading_ts, kwh)
+      - input: source('lake', 'sim_tamper')
+        format: sql
+        rows: |
+          select * from (values
+            ('B', 'bypass', date '2013-03-01', 0.4, cast(null as double)),
+            ('F', 'flatline', date '2013-03-01', 1.0, 0.05),
+            ('N', 'night_bypass', date '2013-03-01', 1.0, cast(null as double)),
+            ('C', 'credit_tamper', date '2013-03-01', 0.3, cast(null as double))
+          ) as t(meter_id, tamper_type, start_date, factor, flat_kwh)
+    expect:
+      rows:
+        - {meter_id: B, reading_date: 2013-01-01, metered_kwh: 1.0}
+        - {meter_id: B, reading_date: 2013-06-01, metered_kwh: 0.4}
+        - {meter_id: F, reading_date: 2013-06-01, metered_kwh: 0.05}
+        - {meter_id: N, reading_date: 2013-06-01, metered_kwh: 1.0}
+        - {meter_id: C, reading_date: 2013-06-01, metered_kwh: 1.0}

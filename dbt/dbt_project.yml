@@ -12,8 +12,21 @@ target-path: target
 clean-targets:
 - target
 - dbt_packages
+vars:
+  lake: "../data/lake"             # Delta tables, relative to the dbt directory
+  # Scoring compares the same weeks a year apart, so seasonality cancels out.
+  baseline_start: "2012-10-01"
+  baseline_end: "2012-12-31"
+  eval_start: "2013-10-01"
+  eval_end: "2013-12-31"
+  tariff_p_per_kwh: 14.228
+
 models:
   smart_meter_revenue_protection:
+    simulation:
+      +schema: silver
+      +materialized: table
+      +tags: [simulation]
     staging:
       +schema: silver
       +materialized: view
