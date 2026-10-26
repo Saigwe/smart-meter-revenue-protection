@@ -1,11 +1,11 @@
 """Score every meter, rank the inspection list, and measure detection against the planted (ground-truth) theft.
 
 Scores, from gold.rpt_meter_features (metered data, vends and feeder supply only):
-  rules     four explainable rules, one per theft pattern, combined as a weighted count
-              drop      consumption fell to under 60% of last year's, relative to the feeder's median change
+  rules     four explainable rules, one per theft pattern, summed by severity
+              drop      use fell to under 60% of last year's (relative to the feeder) AND in an abrupt step (< 0.7)
               unpaid    the customer bought under 60% of what was metered, having bought >= 80% a year before
               flat      the meter reported a near-constant value on most days
-              night     night-time share of use fell to under 30% of last year's
+              night     night-time share fell to under 30% of last year's AND in an abrupt step (< 0.5)
   iforest   an Isolation Forest on the same features (unsupervised: it never sees a label)
   combined  the average of the two rank percentiles
 Revenue at risk per year = estimated unbilled kWh per day x 365 x tariff, where unbilled is the larger of the
@@ -25,16 +25,26 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest
 
 FEATURES = ["consumption_ratio_vs_feeder", "eval_purchase_ratio", "eval_flat_day_share", "night_share_ratio",
-            "consumption_ratio", "eval_gap_kwh_per_day", "feeder_excess_loss_share"]
+            "consumption_ratio", "eval_gap_kwh_per_day", "feeder_excess_loss_share", "step_ratio", "night_step_ratio"]
 
 
 def rules(f: pd.DataFrame) -> pd.DataFrame:
-    hits = pd.DataFrame(index=f.index)
-    hits["drop"] = f.consumption_ratio_vs_feeder < 0.6
-    hits["unpaid"] = (f.eval_purchase_ratio < 0.6) & (f.base_purchase_ratio >= 0.8)
-    hits["flat"] = f.eval_flat_day_share > 0.5
-    hits["night"] = (f.night_share_ratio < 0.3) & (f.base_night_share > 0.05)
-    return hits.fillna(False)
+    """Each rule's SEVERITY in [0, 1] (0 = not triggered). Thresholds are set from the patterns, not tuned on labels.
+    A drop or night rule needs an abrupt, lasting step as well, so a household that gradually used less is not flagged."""
+    sev = pd.DataFrame(index=f.index)
+    step = f.step_ratio.fillna(1)
+    drop = ((0.6 - f.consumption_ratio_vs_feeder) / 0.6).clip(0, 1)
+    # Feeder energy-balance confirmation (rpt_meter_features.feeder_confirmation) was tried and NOT used: with ~140
+    # meters a feeder, one household's drop is about the size of the feeder's measurement noise, and adding it cut
+    # precision at k = 167 from 54.5% to 37.7% (results/detection_v3_feeder_confirmation.md).
+    sev["drop"] = np.where((f.consumption_ratio_vs_feeder < 0.6) & (step < 0.7), drop.fillna(0) + 0.5, 0)
+    unpaid = ((0.6 - f.eval_purchase_ratio) / 0.6).clip(0, 1)
+    sev["unpaid"] = np.where((f.eval_purchase_ratio < 0.6) & (f.base_purchase_ratio >= 0.8), unpaid.fillna(0) + 0.5, 0)
+    sev["flat"] = np.where(f.eval_flat_day_share > 0.5, f.eval_flat_day_share.fillna(0) + 0.5, 0)
+    night = ((0.3 - f.night_share_ratio) / 0.3).clip(0, 1)
+    sev["night"] = np.where((f.night_share_ratio < 0.3) & (f.base_night_share > 0.05) & (f.night_step_ratio.fillna(1) < 0.5),
+                            night.fillna(0) + 0.5, 0)
+    return sev
 
 
 def precision_recall(order: np.ndarray, truth: np.ndarray, k: int) -> tuple[float, float]:
@@ -52,7 +62,8 @@ def main() -> None:
     args = ap.parse_args()
     con = duckdb.connect(args.db)
     con.execute("install delta; load delta")
-    f = con.execute("select * from gold.rpt_meter_features").df().set_index("meter_id")
+    # ordered: the isolation forest samples rows, so row order must be fixed for reproducible scores
+    f = con.execute("select * from gold.rpt_meter_features order by meter_id").df().set_index("meter_id")
 
     hits = rules(f)
     f["rule_hits"] = hits.sum(axis=1)
