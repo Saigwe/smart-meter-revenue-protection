@@ -120,7 +120,7 @@ pip install -r spark/requirements.txt && make spark   # the Spark version (needs
 - [x] Ranked inspection list with revenue at risk; Spark job timings (CI, real data)
 - [ ] Transformer-level energy balance to confirm single bypasses
 - [ ] Incremental daily loads (Delta MERGE) instead of a full reload
-- [ ] 3-minute Loom walkthrough
+- [ ] 3-minute Loom walkthrough ([script ready](docs/walkthrough.md))
 
 ## Interview topics this project prepares
 - Lakehouse layout at scale: partitioning vs clustering (Z-order), file sizes, compression
