@@ -22,6 +22,7 @@ simulate:   ## SYNTHETIC vends, feeders and planted theft
 	$(PY) ingestion/simulate.py --lake $(LAKE)
 
 dbt:
+	mkdir -p $(dir $(DB))
 	cd dbt && DUCKDB_PATH=../$(DB) $(DBT_BIN) build --profiles-dir . --vars '{lake: "../$(LAKE)"}'
 
 score:      ## rules + isolation forest, precision on the planted cases, inspection list
