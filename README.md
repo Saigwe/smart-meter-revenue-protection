@@ -20,6 +20,13 @@ Project 17 of my portfolio plan. At a Nigerian electricity distribution company 
 | **Why it matters** | An inspection list where more than half of the top 167 are real cases, against a 3.2% base rate (17x better than random), each with the rule that fired and the revenue at stake. |
 | **Proof** | [Numbers](#numbers), from the full 167.8M-row run; detection reports in [`results/`](results). |
 
+## Charts
+Rendered from this repo's own results by `charts/make_charts.py` (`make charts`); CI re-renders them on every push.
+
+![Precision of the inspection list](docs/charts/precision_at_k.png)
+
+![Planted meters found by tamper type](docs/charts/by_tamper_type.png)
+
 ## Architecture
 ```mermaid
 flowchart LR

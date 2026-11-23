@@ -6,7 +6,7 @@ RESULTS ?= results
 DBT_BIN ?= dbt
 LCL_ZIP = https://data.london.gov.uk/download/vqm0d/04feba67-f1a3-4563-98d0-f3071e3d56d1/Partitioned%20LCL%20Data.zip
 
-.PHONY: all download load simulate dbt score test spark fixture-all clean
+.PHONY: all download load simulate dbt score test spark fixture-all clean charts
 
 all: load simulate dbt score test   ## the real 167.9M readings (run `make download` once first)
 
@@ -40,3 +40,6 @@ fixture-all:   ## synthetic LCL-format CSVs through the same pipeline (CI)
 
 clean:
 	rm -rf warehouse dbt/target dbt/logs data/lake data/fixture
+
+charts:                                            ## README charts -> docs/charts
+	$(PY) charts/make_charts.py

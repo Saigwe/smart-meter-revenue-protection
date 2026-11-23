@@ -21,6 +21,8 @@ jobs:
           java-version: "17"
       - name: Fixture pipeline (LCL-format CSVs -> Delta -> simulation -> dbt -> scoring -> lineage tests)
         run: make fixture-all
+      - name: README charts render from the results
+        run: python charts/make_charts.py
       - name: Same pipeline as Spark jobs on the Delta lake
         run: make spark LAKE=data/fixture/lake RESULTS=data/fixture/results
       - name: Spark results equal dbt's

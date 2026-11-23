@@ -7,3 +7,4 @@ numpy>=1.26
 pyarrow>=17
 scikit-learn>=1.6,<2
 pytest>=8
+matplotlib>=3.8
